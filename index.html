@@ -335,7 +335,7 @@ body { background-color: #050608; display: flex; justify-content: center; paddin
 <div class="cs-root">
 <div class="hud-head">
   <div class="hud-logo disp"><i class="ti ti-crosshair"></i>CS:MAJOR<span class="sub">// 7a0 DRAFT</span></div>
-  <div class="hud-status"><span class="dot"></span>SERVIDOR ATIVO <span style="color:var(--grn-dim)">v8</span><br><span id="hud-phase">DRAFT PHASE</span></div>
+  <div class="hud-status"><span class="dot"></span>SERVIDOR ATIVO <span style="color:var(--grn-dim)">v9</span><br><span id="hud-phase">DRAFT PHASE</span></div>
 </div>
 <div class="cs-pad">
 <div id="s-draft" class="screen active">
@@ -796,20 +796,35 @@ async function resolveSwiss(oppId){
   const cont=document.getElementById('swiss-content');
   cont.innerHTML=`<div id="topslot"></div><div class="match-stage">Fase Suíça // BO1 // ${flag(opp.country)} ${opp.name}</div>${renderVeto(res,1)}${buildBoardShell(opp,'Fase Suíça',1)}<div class="btn-row" id="postmatch"></div>`;
 
-  try{ await playSeriesLive(res,opp,1); }
-  catch(e){ console.error('Erro na animação (suíça):',e); LIVE=false; }
-
+  // ===== resultado e botões calculados ANTES de animar =====
   const ps=G.swiss['myteam'];
-  if(won){ps.wins++;G.swWins++;sfx.win();}else{ps.losses++;G.swLosses++;sfx.loss();}
+  if(won){ps.wins++;G.swWins++;}else{ps.losses++;G.swLosses++;}
   if(G.swiss[oppId]){if(won)G.swiss[oppId].losses++;else G.swiss[oppId].wins++;}
   G.swRound++;setPhase(`SUÍÇA ${ps.wins}V - ${ps.losses}D`);
   G.history.push({stage:'Fase Suíça',bo:1,opp:opp.name,oppCountry:opp.country,won,score:`${sa}-${sb}`,scoreA:sa,scoreB:sb});
 
-  let bannerHtml='',btnHtml='';
-  if(ps.wins>=3){bannerHtml=`<div class="res-banner win"><h2><i class="ti ti-trophy"></i> CLASSIFICADO</h2><p>Você avançou para os Playoffs (${ps.wins}V-${ps.losses}D)</p></div>`;btnHtml=`<button class="btn btn-p" onclick="startPlayoffs()">Avançar aos Playoffs <i class="ti ti-arrow-right"></i></button>`;if(CFG.mode==='auto')setTimeout(()=>{if(!LIVE)startPlayoffs();},SPEEDS[CFG.speed]*4);}
-  else if(ps.losses>=3){sfx.c4();bannerHtml=`<div class="res-banner loss"><h2><i class="ti ti-bomb"></i> ELIMINADO</h2><p>Fim da linha na Fase Suíça (${ps.wins}V-${ps.losses}D)</p></div>`;btnHtml=`<button class="btn btn-p" onclick="showCampaignEnd(false)"><i class="ti ti-list"></i> Ver Resumo da Campanha</button> <button class="btn btn-s" onclick="restartAll()"><i class="ti ti-refresh"></i> Novo Draft</button>`;}
-  else{bannerHtml='';btnHtml=`<button class="btn btn-p" onclick="renderSwiss()">Próxima Rodada <i class="ti ti-arrow-right"></i></button>`;if(CFG.mode==='auto')setTimeout(()=>{if(!LIVE)renderSwiss();},SPEEDS[CFG.speed]*4);}
-  injectButtons('swiss-content',bannerHtml,btnHtml,CFG.mode==='manual');
+  let bannerHtml='',btnHtml='',autoNext=null;
+  if(ps.wins>=3){bannerHtml=`<div class="res-banner win"><h2><i class="ti ti-trophy"></i> CLASSIFICADO</h2><p>Você avançou para os Playoffs (${ps.wins}V-${ps.losses}D)</p></div>`;btnHtml=`<button class="btn btn-p" onclick="startPlayoffs()">Avançar aos Playoffs <i class="ti ti-arrow-right"></i></button>`;autoNext=()=>startPlayoffs();}
+  else if(ps.losses>=3){bannerHtml=`<div class="res-banner loss"><h2><i class="ti ti-bomb"></i> ELIMINADO</h2><p>Fim da linha na Fase Suíça (${ps.wins}V-${ps.losses}D)</p></div>`;btnHtml=`<button class="btn btn-p" onclick="showCampaignEnd(false)"><i class="ti ti-list"></i> Ver Resumo da Campanha</button> <button class="btn btn-s" onclick="restartAll()"><i class="ti ti-refresh"></i> Novo Draft</button>`;}
+  else{bannerHtml='';btnHtml=`<button class="btn btn-p" onclick="renderSwiss()">Próxima Rodada <i class="ti ti-arrow-right"></i></button>`;autoNext=()=>renderSwiss();}
+
+  let finalized=false;
+  const finalize=()=>{
+    if(finalized)return;finalized=true;
+    const elSkip=document.getElementById('lv-skip');if(elSkip)elSkip.remove();
+    if(won)sfx.win();else sfx.loss();
+    if(ps.losses>=3)sfx.c4();
+    injectButtons('swiss-content',bannerHtml,btnHtml,CFG.mode==='manual');
+    if(CFG.mode==='auto'&&autoNext)setTimeout(()=>{if(!LIVE)autoNext();},SPEEDS[CFG.speed]*4);
+  };
+
+  const totalRounds=res.maps.reduce((a,m)=>a+m.seq.length,0);
+  const maxMs=totalRounds*SPEEDS[CFG.speed]+4000;
+  const watchdog=setTimeout(()=>{ if(!finalized){console.warn('watchdog suíça');LIVE=false;finalize();} },maxMs);
+  try{ await playSeriesLive(res,opp,1); }
+  catch(e){ console.error('Erro na animação (suíça):',e); LIVE=false; }
+  clearTimeout(watchdog);
+  finalize();
 }
 
 /* ===================== PLAYOFFS ===================== */
@@ -853,21 +868,35 @@ async function resolvePO(oppId,stageName,stageKey){
   const cont=document.getElementById('playoffs-content');
   cont.innerHTML=`<div id="topslot"></div><div class="match-stage">${stageName} // ${isFinal?'BO5':'BO3'} // ${flag(opp.country)} ${opp.name}</div>${renderVeto(res,bo)}${buildBoardShell(opp,stageName,bo)}<div class="btn-row" id="postmatch"></div>`;
 
-  try{ await playSeriesLive(res,opp,bo); }
-  catch(e){ console.error('Erro na animação (playoffs):',e); LIVE=false; }
-
-  // registra histórico (placar da série em mapas)
+  // ===== calcula resultado e botões JÁ, antes de animar =====
   G.history.push({stage:stageName,bo,opp:opp.name,oppCountry:opp.country,won,score:`${res.wA}-${res.wB}`,scoreA:res.wA,scoreB:res.wB,maps:res.maps.map(m=>({name:m.mapName,a:m.mA,b:m.mB,ot:m.ot,won:m.winner==='A'}))});
-
-  let bannerHtml='',btnHtml='';
-  if(!won){sfx.c4();bannerHtml=`<div class="res-banner loss"><h2><i class="ti ti-bomb"></i> ELIMINADO</h2><p>Derrota para ${opp.name} na ${stageName} (${res.wA}-${res.wB})</p></div>`;btnHtml=`<button class="btn btn-p" onclick="showCampaignEnd(false)"><i class="ti ti-list"></i> Ver Resumo da Campanha</button> <button class="btn btn-s" onclick="restartAll()"><i class="ti ti-refresh"></i> Novo Draft</button>`;}
+  let bannerHtml='',btnHtml='',autoNext=null;
+  if(!won){bannerHtml=`<div class="res-banner loss"><h2><i class="ti ti-bomb"></i> ELIMINADO</h2><p>Derrota para ${opp.name} na ${stageName} (${res.wA}-${res.wB})</p></div>`;btnHtml=`<button class="btn btn-p" onclick="showCampaignEnd(false)"><i class="ti ti-list"></i> Ver Resumo da Campanha</button> <button class="btn btn-s" onclick="restartAll()"><i class="ti ti-refresh"></i> Novo Draft</button>`;}
   else{
-    sfx.win();G._poPlayed.push(oppId);
+    G._poPlayed.push(oppId);
     const next={qf:{n:'Semifinal',k:'sf'},sf:{n:'Grande Final',k:'final'}};
     if(!next[stageKey]){bannerHtml=`<div class="res-banner win"><h2><i class="ti ti-trophy"></i> CAMPEÃO DO MAJOR</h2><p>Sua lineup conquistou o título! GGWP 🏆</p></div>`;btnHtml=`<button class="btn btn-p" onclick="showCampaignEnd(true)"><i class="ti ti-list"></i> Ver Resumo da Campanha</button>`;}
-    else{bannerHtml=`<div class="res-banner win"><h2><i class="ti ti-check"></i> VITÓRIA</h2><p>Avançou para a ${next[stageKey].n} (${res.wA}-${res.wB})</p></div>`;btnHtml=`<button class="btn btn-p" onclick="renderPO('${next[stageKey].n}','${next[stageKey].k}')">Avançar para ${next[stageKey].n} <i class="ti ti-arrow-right"></i></button>`;if(CFG.mode==='auto')setTimeout(()=>{if(!LIVE)renderPO(next[stageKey].n,next[stageKey].k);},SPEEDS[CFG.speed]*4);}
+    else{bannerHtml=`<div class="res-banner win"><h2><i class="ti ti-check"></i> VITÓRIA</h2><p>Avançou para a ${next[stageKey].n} (${res.wA}-${res.wB})</p></div>`;btnHtml=`<button class="btn btn-p" onclick="renderPO('${next[stageKey].n}','${next[stageKey].k}')">Avançar para ${next[stageKey].n} <i class="ti ti-arrow-right"></i></button>`;autoNext=()=>renderPO(next[stageKey].n,next[stageKey].k);}
   }
-  injectButtons('playoffs-content',bannerHtml,btnHtml,CFG.mode==='manual');
+  // função que finaliza: toca som, injeta botões. Roda no fim da animação OU via watchdog.
+  let finalized=false;
+  const finalize=()=>{
+    if(finalized)return;finalized=true;
+    const elSkip=document.getElementById('lv-skip');if(elSkip)elSkip.remove();
+    if(won)sfx.win();else sfx.c4();
+    injectButtons('playoffs-content',bannerHtml,btnHtml,CFG.mode==='manual');
+    if(CFG.mode==='auto'&&autoNext)setTimeout(()=>{if(!LIVE)autoNext();},SPEEDS[CFG.speed]*4);
+  };
+
+  // anima; se travar/explodir, o watchdog finaliza
+  // watchdog: tempo máximo = rounds totais estimados * velocidade + folga. Se estourar, finaliza à força.
+  const totalRounds=res.maps.reduce((a,m)=>a+m.seq.length,0);
+  const maxMs=totalRounds*SPEEDS[CFG.speed]+res.maps.length*SPEEDS[CFG.speed]*3+4000;
+  const watchdog=setTimeout(()=>{ if(!finalized){console.warn('watchdog: animação não terminou, finalizando à força');LIVE=false;finalize();} },maxMs);
+  try{ await playSeriesLive(res,opp,bo); }
+  catch(e){ console.error('Erro na animação (playoffs):',e); LIVE=false; }
+  clearTimeout(watchdog);
+  finalize();
 }
 
 /* ===================== RESUMO DA CAMPANHA ===================== */
