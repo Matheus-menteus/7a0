@@ -157,6 +157,7 @@ body { background-color: #050608; display: flex; justify-content: center; paddin
 .board-curmap { font-size:12px; color:var(--amber); letter-spacing:.05em; margin:6px 0 4px; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px; min-height:16px; }
 .board-curmap b { color:#fff; font-weight:700; }
 .board-curmap i { font-size:13px; }
+.curmap-score { font-family:'Rajdhani',sans-serif; font-size:18px; font-weight:700; color:var(--txt); background:rgba(255,255,255,.08); padding:2px 10px; border-radius:5px; letter-spacing:.05em; }
 /* botão de pular animação */
 .board-skip { margin-top:14px; }
 .btn-skip { background:rgba(255,255,255,.06); border:1px solid var(--line2); color:var(--txt2); padding:8px 16px; font-size:11px; }
@@ -335,7 +336,7 @@ body { background-color: #050608; display: flex; justify-content: center; paddin
 <div class="cs-root">
 <div class="hud-head">
   <div class="hud-logo disp"><i class="ti ti-crosshair"></i>CS:MAJOR<span class="sub">// 7a0 DRAFT</span></div>
-  <div class="hud-status"><span class="dot"></span>SERVIDOR ATIVO <span style="color:var(--grn-dim)">v11</span><br><span id="hud-phase">DRAFT PHASE</span></div>
+  <div class="hud-status"><span class="dot"></span>SERVIDOR ATIVO <span style="color:var(--grn-dim)">v12</span><br><span id="hud-phase">DRAFT PHASE</span></div>
 </div>
 <div class="cs-pad">
 <div id="s-draft" class="screen active">
@@ -660,10 +661,8 @@ function buildBoardShell(oppTeam,stageName,bo){
   const myP=G.myTeam.players;const oppP=oppTeam.players||[];
   let b=`<div class="board"><div class="board-top"><div class="board-mapbg" id="lv-mapbg"></div><div class="board-scanline"></div><div class="board-top-in">
     <div class="board-maprow"><span id="lv-stage">${stageName} // BO${bo}</span></div>`;
-  // Em Bo3/Bo5: contador de série em mapas, BEM visível acima do placar
-  if(bo>1){b+=`<div class="series-pips" id="lv-pips"></div>`;}
   b+=`<div class="board-bigscore"><span class="board-sc live" id="lv-a">0</span><span class="board-sc-colon">:</span><span class="board-sc live" id="lv-b">0</span></div>
-    <div class="board-curmap" id="lv-curmap"></div>
+    <div class="board-curmap" id="lv-curmap">${bo>1?'<span style="color:var(--txt3)">placar da série em mapas</span>':''}</div>
     <div class="board-teams-lbl"><b>⚡ Seu Time</b> <span style="color:var(--txt3)">VS</span> <b>${flag(oppTeam.country)} ${oppTeam.name}</b></div>
     <div class="board-halftime" id="lv-half"></div>
     <div class="board-skip" id="lv-skip"><button class="btn btn-skip" onclick="skipMatch()"><i class="ti ti-player-skip-forward"></i> Pular para o resultado</button></div></div></div>`;
@@ -687,19 +686,9 @@ async function playSeriesLive(res,oppTeam,bo){
   let serA=0,serB=0;
   const myP=G.myTeam.players,oppP=oppTeam.players||[];
   const totalPotential=bo===1?1:(res.mapsNeeded*2-1);
-  // helper: o board ainda está na tela?
   const alive=()=>!!document.getElementById('lv-a');
-  // espera respeitando SKIP: se SKIP ligado, não espera nada
   const wait=async(ms)=>{ if(SKIP||!alive())return; await sleep(ms); };
-
-  // pips de série (bolinhas de mapa ganho) no topo
-  function renderPips(){
-    const el=document.getElementById('lv-pips');if(!el)return;
-    let h='';for(let i=0;i<res.mapsNeeded;i++){h+=`<span class="pip-dot ${i<serA?'won':''}"></span>`;}
-    h+=`<span class="pip-vs">${serA} - ${serB}</span>`;
-    for(let i=0;i<res.mapsNeeded;i++){h+=`<span class="pip-dot opp ${i<serB?'won':''}"></span>`;}
-    el.innerHTML=h;
-  }
+  const setBig=(a,b,clsA,clsB)=>{const elA=document.getElementById('lv-a'),elB=document.getElementById('lv-b');if(elA){elA.textContent=a;elA.className='board-sc '+(clsA||'live');}if(elB){elB.textContent=b;elB.className='board-sc '+(clsB||'live');}};
 
   try{
     // cria as linhas de mapa potenciais (histórico embaixo)
@@ -711,24 +700,24 @@ async function playSeriesLive(res,oppTeam,bo){
         elMaps.insertAdjacentHTML('beforeend',`<div class="map-line pending" id="ml-${i}"><span class="mn"><i class="ti ti-map-pin" style="font-size:11px"></i>${mp}</span><span class="msc"><span class="ms" id="ml-a-${i}">—</span><span class="ms-sep">·</span><span class="ms" id="ml-b-${i}">—</span></span><span class="mot" id="ml-ot-${i}"></span><span class="mw" id="ml-w-${i}">não disputado</span></div>`);
       }
     }
-    if(bo>1)renderPips();
+    // placar grande inicia em 0:0 (em Bo1 = rounds; em Bo3/Bo5 = mapas ganhos)
+    setBig(0,0);
 
     for(let mi=0;mi<res.maps.length;mi++){
       const m=res.maps[mi];
       const elMapbg=document.getElementById('lv-mapbg');if(elMapbg)elMapbg.style.backgroundColor=MAP_BG[m.mapName]||'#111';
       const elStage=document.getElementById('lv-stage'),elCur=document.getElementById('lv-curmap');
       if(elStage)elStage.innerHTML=`${stageLabel(bo)} <span class="board-livetag"><span class="lvdot"></span>AO VIVO</span>`;
-      if(elCur)elCur.innerHTML=bo>1?`<i class="ti ti-map-pin"></i> Mapa ${mi+1} · <b>${m.mapName}</b>`:`<i class="ti ti-map-pin"></i> <b>${m.mapName}</b>`;
       const mlRow=document.getElementById('ml-'+mi);if(mlRow)mlRow.classList.remove('pending');
       const mlWInit=document.getElementById('ml-w-'+mi);if(mlWInit)mlWInit.textContent='ao vivo';
 
-      // anima rounds (se a tela ainda existe); se sumir, faz fast-forward sem sleep
+      // anima os rounds DESTE mapa. Em Bo1 o placar grande são os rounds; em Bo3/Bo5 mostramos
+      // o placar do mapa no "curmap" (centro) e o placar grande continua sendo a SÉRIE.
       for(let r=0;r<m.seq.length;r++){
         const s=m.seq[r];
-        const elA=document.getElementById('lv-a'),elB=document.getElementById('lv-b');
-        const mlA=document.getElementById('ml-a-'+mi),mlB=document.getElementById('ml-b-'+mi),elHalf=document.getElementById('lv-half');
-        if(elA)elA.textContent=s.a;if(elB)elB.textContent=s.b;
-        if(elA&&elB){const mine=s.w==='A';const bumped=mine?elA:elB;bumped.classList.remove('bump');void bumped.offsetWidth;bumped.classList.add('bump');}
+        const mlA=document.getElementById('ml-a-'+mi),mlB=document.getElementById('ml-b-'+mi),elHalf=document.getElementById('lv-half'),elCur2=document.getElementById('lv-curmap');
+        if(bo===1){ setBig(s.a,s.b); const ea=document.getElementById('lv-a'),eb=document.getElementById('lv-b');const bumped=s.w==='A'?ea:eb;if(bumped){bumped.classList.remove('bump');void bumped.offsetWidth;bumped.classList.add('bump');} }
+        else { if(elCur2)elCur2.innerHTML=`<i class="ti ti-map-pin"></i> Mapa ${mi+1}/${totalPotential} · <b>${m.mapName}</b> &nbsp; <span class="curmap-score">${s.a} : ${s.b}</span>`; }
         if(mlA)mlA.textContent=s.a;if(mlB)mlB.textContent=s.b;
         if(alive()&&!SKIP)sfx.tick(s.w==='A');
         if(elHalf){if(s.a+s.b===12)elHalf.textContent='— troca de lado —';else if(m.ot&&(s.a+s.b)>24&&(s.a+s.b-24)%6===0)elHalf.textContent='— overtime —';else elHalf.textContent=`round ${s.a+s.b}`;}
@@ -736,9 +725,6 @@ async function playSeriesLive(res,oppTeam,bo){
       }
       // fim do mapa
       const aw=m.winner==='A';
-      const elA=document.getElementById('lv-a'),elB=document.getElementById('lv-b');
-      if(elA){elA.classList.toggle('w',aw);elA.classList.toggle('l',!aw);}
-      if(elB){elB.classList.toggle('w',!aw);elB.classList.toggle('l',aw);}
       const mlA=document.getElementById('ml-a-'+mi),mlB=document.getElementById('ml-b-'+mi);
       if(mlA){mlA.textContent=m.mA;mlA.classList.toggle('w',aw);mlA.classList.toggle('l',!aw);}
       if(mlB){mlB.textContent=m.mB;mlB.classList.toggle('w',!aw);mlB.classList.toggle('l',aw);}
@@ -746,7 +732,8 @@ async function playSeriesLive(res,oppTeam,bo){
       const mlOt=document.getElementById('ml-ot-'+mi),mlW=document.getElementById('ml-w-'+mi);
       if(mlOt&&m.ot)mlOt.textContent='OT';if(mlW)mlW.textContent=aw?'Seu Time':oppTeam.name;
       if(aw)serA++;else serB++;
-      if(bo>1)renderPips();
+      // ATUALIZA O PLACAR GRANDE = SÉRIE (mapas) — só em Bo3/Bo5
+      if(bo>1){const ea=document.getElementById('lv-a'),eb=document.getElementById('lv-b');setBig(serA,serB);const bumped=aw?ea:eb;if(bumped){bumped.classList.remove('bump');void bumped.offsetWidth;bumped.classList.add('bump');}}
       if(alive())sfx.map();
 
       // highlights
@@ -754,21 +741,18 @@ async function playSeriesLive(res,oppTeam,bo){
       if(elFeed){genHLForMap(m,myP,oppP).forEach(h=>{elFeed.insertAdjacentHTML('beforeend',`<div class="hl-item"><span class="hl-wep"><i class="ti ${h.wep}"></i></span><span class="hl-map">${h.map}</span><span class="hl-text">${h.text}</span></div>`);});}
 
       if(serA>=res.mapsNeeded||serB>=res.mapsNeeded)break;
-      await wait(dur*3);
-      // reset placar grande pro próximo mapa
-      if(mi<res.maps.length-1){const ea=document.getElementById('lv-a'),eb=document.getElementById('lv-b'),eh=document.getElementById('lv-half');if(ea){ea.textContent='0';ea.className='board-sc live';}if(eb){eb.textContent='0';eb.className='board-sc live';}if(eh)eh.textContent='';}
+      await wait(dur*2);
     }
 
-    // estado final
-    const elSkip=document.getElementById('lv-skip');if(elSkip)elSkip.style.display='none';
-    const elA=document.getElementById('lv-a'),elB=document.getElementById('lv-b'),elStage=document.getElementById('lv-stage'),elHalf=document.getElementById('lv-half'),elCur=document.getElementById('lv-curmap');
-    if(bo>1){const won=serA>serB;if(elA){elA.textContent=serA;elA.className='board-sc '+(won?'w':'l');}if(elB){elB.textContent=serB;elB.className='board-sc '+(won?'l':'w');}if(elStage)elStage.innerHTML=`Série encerrada · ${stageLabel(bo)}`;if(elCur)elCur.innerHTML=`<i class="ti ti-flag-checkered"></i> Resultado final em mapas`;renderPips();}
-    else{if(elStage)elStage.innerHTML=`${res.maps[0].mapName} · Final`;}
+    // estado final: marca vencedor no placar grande (já está com o valor certo)
+    const won=bo===1?(res.maps[0].winner==='A'):(serA>serB);
+    setBig(bo===1?res.maps[0].mA:serA, bo===1?res.maps[0].mB:serB, won?'w':'l', won?'l':'w');
+    const elStage=document.getElementById('lv-stage'),elHalf=document.getElementById('lv-half'),elCur=document.getElementById('lv-curmap');
+    if(elStage)elStage.innerHTML=`${bo===1?res.maps[0].mapName:'Série'} encerrada · ${stageLabel(bo)}`;
+    if(elCur&&bo>1)elCur.innerHTML=`<i class="ti ti-flag-checkered"></i> ${won?'Vitória':'Derrota'} por ${serA}-${serB} em mapas`;
     if(elHalf)elHalf.textContent='';
   } finally {
-    LIVE=false; // GARANTE que nunca trava, aconteça o que acontecer
-    // segunda garantia: se houver um callback de pós-partida pendente, dispara
-    if(typeof G._afterMatch==='function'){const cb=G._afterMatch;G._afterMatch=null;try{cb();}catch(e){console.error('afterMatch erro:',e);}}
+    LIVE=false;
   }
 }
 function stageLabel(bo){return bo===1?'BO1':(bo===3?'BO3':'BO5');}
