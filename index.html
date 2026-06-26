@@ -336,7 +336,7 @@ body { background-color: #050608; display: flex; justify-content: center; paddin
 <div class="cs-root">
 <div class="hud-head">
   <div class="hud-logo disp"><i class="ti ti-crosshair"></i>CS:MAJOR<span class="sub">// 7a0 DRAFT</span></div>
-  <div class="hud-status"><span class="dot"></span>SERVIDOR ATIVO <span style="color:var(--grn-dim)">v12</span><br><span id="hud-phase">DRAFT PHASE</span></div>
+  <div class="hud-status"><span class="dot"></span>SERVIDOR ATIVO <span style="color:var(--grn-dim)">v13</span><br><span id="hud-phase">DRAFT PHASE</span></div>
 </div>
 <div class="cs-pad">
 <div id="s-draft" class="screen active">
@@ -761,7 +761,7 @@ function stageLabel(bo){return bo===1?'BO1':(bo===3?'BO3':'BO5');}
 function pickOpp(){const ps=G.swiss['myteam'];const same=Object.values(G.swiss).filter(s=>s.team.id!=='myteam'&&s.wins===ps.wins&&s.losses===ps.losses);const pool=same.length?same:Object.values(G.swiss).filter(s=>s.team.id!=='myteam'&&s.wins+s.losses<5);return pool[Math.floor(Math.random()*pool.length)].team;}
 
 function renderSwiss(){
-  if(LIVE)return;
+  LIVE=false;SKIP=true;PENDING_FINALIZE=null;
   const ps=G.swiss['myteam'];const opp=pickOpp();G._swOpp=opp;setPhase(`SUÍÇA ${ps.wins}V - ${ps.losses}D`);
   const standing=Object.values(G.swiss).sort((a,b)=>(b.wins-b.losses)-(a.wins-a.losses));
   let tbl=`<table class="stbl"><thead><tr><th>#</th><th>Equipe</th><th>V</th><th>D</th><th>Status</th></tr></thead><tbody>`;
@@ -797,11 +797,7 @@ async function resolveSwiss(oppId){
   else if(ps.losses>=3){bannerHtml=`<div class="res-banner loss"><h2><i class="ti ti-bomb"></i> ELIMINADO</h2><p>Fim da linha na Fase Suíça (${ps.wins}V-${ps.losses}D)</p></div>`;btnHtml=`<button class="btn btn-p" onclick="showCampaignEnd(false)"><i class="ti ti-list"></i> Ver Resumo da Campanha</button> <button class="btn btn-s" onclick="restartAll()"><i class="ti ti-refresh"></i> Novo Draft</button>`;}
   else{bannerHtml='';btnHtml=`<button class="btn btn-p" onclick="renderSwiss()">Próxima Rodada <i class="ti ti-arrow-right"></i></button>`;autoNext=()=>renderSwiss();}
 
-  runSeriesAndFinish(res,opp,1,()=>{
-    try{ injectButtons('swiss-content',bannerHtml,btnHtml,CFG.mode==='manual'); }catch(e){console.error(e);}
-    try{ if(won)sfx.win();else sfx.loss(); if(ps.losses>=3)sfx.c4(); }catch(e){}
-    if(CFG.mode==='auto'&&autoNext)setTimeout(()=>{if(!LIVE)autoNext();},SPEEDS[CFG.speed]*4);
-  });
+  playMatchFlow({res,opp,bo:1,won,bannerHtml,btnHtml,autoNext,contId:'swiss-content',loseSound:ps.losses>=3});
 }
 
 /* ===================== PLAYOFFS ===================== */
@@ -824,36 +820,17 @@ function injectButtons(containerId,bannerHtml,btnHtml,doScroll){
   if(doScroll&&top){try{top.scrollIntoView({behavior:'smooth',block:'start'});}catch(e){}}
 }
 
-function startPlayoffs(){if(LIVE)return;const adv=Object.values(G.swiss).filter(s=>s.wins>=3&&s.team.id!=='myteam').map(s=>s.team);const pool=adv.length>=7?adv.slice(0,7):[...adv,...G.bracket.filter(b=>!adv.includes(b))].slice(0,7);G.playoffPool=[G.myTeam,...pool];G._poPlayed=[];showScreen('s-playoffs');renderPO('Quartas de Final','qf');}
+function startPlayoffs(){LIVE=false;SKIP=true;const adv=Object.values(G.swiss).filter(s=>s.wins>=3&&s.team.id!=='myteam').map(s=>s.team);const pool=adv.length>=7?adv.slice(0,7):[...adv,...G.bracket.filter(b=>!adv.includes(b))].slice(0,7);G.playoffPool=[G.myTeam,...pool];G._poPlayed=[];showScreen('s-playoffs');renderPO('Quartas de Final','qf');}
 function getOpp(ex=[]){const pool=G.playoffPool.filter(t=>t.id!=='myteam'&&!ex.includes(t.id));return pool[Math.floor(Math.random()*pool.length)]||G.bracket[0];}
 
 function renderPO(stageName,stageKey){
-  if(LIVE)return;
+  LIVE=false;SKIP=true;PENDING_FINALIZE=null;
   const isFinal=stageKey==='final';const opp=getOpp(G._poPlayed||[]);G._poOpp=opp;setPhase(`PLAYOFFS · ${isFinal?'BO5':'BO3'}`);
   document.getElementById('playoffs-content').innerHTML=`${settingsBar()}
   <div class="match-stage">${stageName} // ${isFinal?'BO5':'BO3'} // Eliminação Direta</div>
   <div class="board"><div class="board-top"><div class="board-scanline"></div><div class="board-top-in"><div class="board-maprow"><span>Confronto Definido</span></div><div class="board-bigscore"><span class="board-sc tie">⚡</span><span class="board-sc-colon">VS</span><span class="board-sc tie">${flag(opp.country)}</span></div><div class="board-teams-lbl"><b>Seu Time [${G.myOvr}]</b> <span style="color:var(--txt3)">VS</span> <b>${flag(opp.country)} ${opp.name} [${opp.rating}]</b></div></div></div></div>
   <div class="btn-row"><button class="btn btn-p" onclick="resolvePO('${opp.id}','${stageName}','${stageKey}')"><i class="ti ti-player-play"></i> Iniciar ${isFinal?'BO5':'BO3'}</button></div>`;
   if(CFG.mode==='auto')setTimeout(()=>{if(!LIVE)resolvePO(opp.id,stageName,stageKey);},SPEEDS[CFG.speed]*3);
-}
-
-/* Roda a animação de uma série e GARANTE que o callback de finalização rode,
-   não importa se a animação termina, trava, ou dá erro.
-   - callback roda no fim normal da animação
-   - OU quando o usuário clica em Pular (via PENDING_FINALIZE)
-   - OU via watchdog curto (4s + tempo estimado) como última garantia */
-function runSeriesAndFinish(res,opp,bo,onDone){
-  let done=false;
-  const finish=()=>{ if(done)return;done=true;PENDING_FINALIZE=null;LIVE=false;
-    try{const elSkip=document.getElementById('lv-skip');if(elSkip)elSkip.remove();}catch(e){}
-    try{onDone();}catch(e){console.error('onDone erro:',e);}
-  };
-  PENDING_FINALIZE=finish; // o botão Pular chama isto
-  const totalRounds=res.maps.reduce((a,m)=>a+m.seq.length,0);
-  const estMs=totalRounds*SPEEDS[CFG.speed]+res.maps.length*SPEEDS[CFG.speed]*3+2000;
-  const watchdog=setTimeout(finish,estMs); // se a animação não terminar no tempo estimado, finaliza
-  // roda a animação (não bloqueia; quando terminar, chama finish)
-  playSeriesLive(res,opp,bo).then(()=>{clearTimeout(watchdog);finish();}).catch(e=>{console.error('anim erro:',e);clearTimeout(watchdog);finish();});
 }
 
 async function resolvePO(oppId,stageName,stageKey){
@@ -873,16 +850,36 @@ async function resolvePO(oppId,stageName,stageKey){
     if(!next[stageKey]){bannerHtml=`<div class="res-banner win"><h2><i class="ti ti-trophy"></i> CAMPEÃO DO MAJOR</h2><p>Sua lineup conquistou o título! GGWP 🏆</p></div>`;btnHtml=`<button class="btn btn-p" onclick="showCampaignEnd(true)"><i class="ti ti-list"></i> Ver Resumo da Campanha</button>`;}
     else{bannerHtml=`<div class="res-banner win"><h2><i class="ti ti-check"></i> VITÓRIA</h2><p>Avançou para a ${next[stageKey].n} (${res.wA}-${res.wB})</p></div>`;btnHtml=`<button class="btn btn-p" onclick="renderPO('${next[stageKey].n}','${next[stageKey].k}')">Avançar para ${next[stageKey].n} <i class="ti ti-arrow-right"></i></button>`;autoNext=()=>renderPO(next[stageKey].n,next[stageKey].k);}
   }
-  // animação roda em paralelo, SEM bloquear a aparição dos botões
-  runSeriesAndFinish(res,opp,bo,()=>{
-    try{ injectButtons('playoffs-content',bannerHtml,btnHtml,CFG.mode==='manual'); }catch(e){console.error(e);}
-    try{ if(won)sfx.win();else sfx.c4(); }catch(e){}
-    if(CFG.mode==='auto'&&autoNext)setTimeout(()=>{if(!LIVE)autoNext();},SPEEDS[CFG.speed]*4);
-  });
+  playMatchFlow({res,opp,bo,won,bannerHtml,btnHtml,autoNext,contId:'playoffs-content',loseSound:true});
+}
+
+/* Fluxo unificado e à prova de falhas:
+   1) Injeta botões + resultado IMEDIATAMENTE (síncrono) — antes de qualquer animação.
+   2) Roda a animação como decoração. Se travar ou falhar, os botões JÁ estão lá.
+   3) O botão "Pular" só acelera a animação (não precisa mais "salvar" os botões). */
+function playMatchFlow({res,opp,bo,won,bannerHtml,btnHtml,autoNext,contId,loseSound}){
+  // (1) RESULTADO + BOTÕES JÁ — síncrono, sem await, impossível travar
+  try{ injectButtons(contId,bannerHtml,btnHtml,false); }catch(e){console.error('injectButtons:',e);}
+  try{ if(won)sfx.win();else (loseSound?sfx.c4():sfx.loss()); }catch(e){}
+  if(CFG.mode==='auto'&&autoNext)setTimeout(()=>{if(!LIVE)autoNext();},SPEEDS[CFG.speed]*4);
+
+  // (2) animação decorativa — atualiza placar ao vivo por cima; pode falhar sem consequência
+  let animDone=false;
+  const cleanup=()=>{ if(animDone)return;animDone=true;PENDING_FINALIZE=null;LIVE=false;
+    try{const elSkip=document.getElementById('lv-skip');if(elSkip)elSkip.remove();}catch(e){}
+  };
+  PENDING_FINALIZE=cleanup;
+  try{
+    playSeriesLive(res,opp,bo).then(cleanup).catch(e=>{console.error('anim:',e);cleanup();});
+  }catch(e){ console.error('anim sync:',e); cleanup(); }
+  // se a animação demorar demais, limpa o skip mesmo assim
+  const totalRounds=res.maps.reduce((a,m)=>a+m.seq.length,0);
+  setTimeout(cleanup, totalRounds*SPEEDS[CFG.speed]+res.maps.length*SPEEDS[CFG.speed]*2+3000);
 }
 
 /* ===================== RESUMO DA CAMPANHA ===================== */
 function showCampaignEnd(champion){
+  LIVE=false;SKIP=true;PENDING_FINALIZE=null;
   showScreen('s-result');setPhase(champion?'CAMPEÃO 🏆':'CAMPANHA ENCERRADA');
   const slots=Object.values(G.slots).filter(Boolean);
   const wins=G.history.filter(h=>h.won).length,losses=G.history.filter(h=>!h.won).length;
