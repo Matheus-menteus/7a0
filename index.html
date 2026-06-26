@@ -335,7 +335,7 @@ body { background-color: #050608; display: flex; justify-content: center; paddin
 <div class="cs-root">
 <div class="hud-head">
   <div class="hud-logo disp"><i class="ti ti-crosshair"></i>CS:MAJOR<span class="sub">// 7a0 DRAFT</span></div>
-  <div class="hud-status"><span class="dot"></span>SERVIDOR ATIVO <span style="color:var(--grn-dim)">v9</span><br><span id="hud-phase">DRAFT PHASE</span></div>
+  <div class="hud-status"><span class="dot"></span>SERVIDOR ATIVO <span style="color:var(--grn-dim)">v10</span><br><span id="hud-phase">DRAFT PHASE</span></div>
 </div>
 <div class="cs-pad">
 <div id="s-draft" class="screen active">
@@ -516,7 +516,12 @@ const SPEEDS={lento:350,medio:160,rapido:55};
 let CFG={mode:'manual',speed:'medio'};
 let LIVE=false;
 let SKIP=false; // quando true, a animação corre instantânea até o fim
-function skipMatch(){SKIP=true;}
+let PENDING_FINALIZE=null; // finalize da partida atual, pode ser forçado pelo skip
+function skipMatch(){
+  SKIP=true;
+  // garante que, mesmo se a animação não terminar sozinha, o resultado apareça
+  setTimeout(()=>{ if(typeof PENDING_FINALIZE==='function'){LIVE=false;PENDING_FINALIZE();} },300);
+}
 
 /* ===================== ÁUDIO ===================== */
 let actx=null;const ac=()=>{if(!actx)actx=new(window.AudioContext||window.webkitAudioContext)();return actx};
@@ -811,12 +816,13 @@ async function resolveSwiss(oppId){
   let finalized=false;
   const finalize=()=>{
     if(finalized)return;finalized=true;
-    const elSkip=document.getElementById('lv-skip');if(elSkip)elSkip.remove();
-    if(won)sfx.win();else sfx.loss();
-    if(ps.losses>=3)sfx.c4();
-    injectButtons('swiss-content',bannerHtml,btnHtml,CFG.mode==='manual');
-    if(CFG.mode==='auto'&&autoNext)setTimeout(()=>{if(!LIVE)autoNext();},SPEEDS[CFG.speed]*4);
+    PENDING_FINALIZE=null;
+    try{ injectButtons('swiss-content',bannerHtml,btnHtml,CFG.mode==='manual'); }catch(e){ console.error('injectButtons falhou:',e); }
+    try{ const elSkip=document.getElementById('lv-skip'); if(elSkip)elSkip.remove(); }catch(e){}
+    try{ if(won)sfx.win();else sfx.loss(); if(ps.losses>=3)sfx.c4(); }catch(e){}
+    try{ if(CFG.mode==='auto'&&autoNext)setTimeout(()=>{if(!LIVE)autoNext();},SPEEDS[CFG.speed]*4); }catch(e){}
   };
+  PENDING_FINALIZE=finalize;
 
   const totalRounds=res.maps.reduce((a,m)=>a+m.seq.length,0);
   const maxMs=totalRounds*SPEEDS[CFG.speed]+4000;
@@ -882,11 +888,17 @@ async function resolvePO(oppId,stageName,stageKey){
   let finalized=false;
   const finalize=()=>{
     if(finalized)return;finalized=true;
-    const elSkip=document.getElementById('lv-skip');if(elSkip)elSkip.remove();
-    if(won)sfx.win();else sfx.c4();
-    injectButtons('playoffs-content',bannerHtml,btnHtml,CFG.mode==='manual');
-    if(CFG.mode==='auto'&&autoNext)setTimeout(()=>{if(!LIVE)autoNext();},SPEEDS[CFG.speed]*4);
+    PENDING_FINALIZE=null;
+    // 1) BOTÕES PRIMEIRO — nada pode impedir que apareçam
+    try{ injectButtons('playoffs-content',bannerHtml,btnHtml,CFG.mode==='manual'); }catch(e){ console.error('injectButtons falhou:',e); }
+    // 2) remove o skip
+    try{ const elSkip=document.getElementById('lv-skip'); if(elSkip)elSkip.remove(); }catch(e){}
+    // 3) som (se falhar, não afeta os botões)
+    try{ if(won)sfx.win();else sfx.c4(); }catch(e){}
+    // 4) auto-avanço
+    try{ if(CFG.mode==='auto'&&autoNext)setTimeout(()=>{if(!LIVE)autoNext();},SPEEDS[CFG.speed]*4); }catch(e){}
   };
+  PENDING_FINALIZE=finalize;
 
   // anima; se travar/explodir, o watchdog finaliza
   // watchdog: tempo máximo = rounds totais estimados * velocidade + folga. Se estourar, finaliza à força.
