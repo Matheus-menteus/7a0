@@ -335,7 +335,7 @@ body { background-color: #050608; display: flex; justify-content: center; paddin
 <div class="cs-root">
 <div class="hud-head">
   <div class="hud-logo disp"><i class="ti ti-crosshair"></i>CS:MAJOR<span class="sub">// 7a0 DRAFT</span></div>
-  <div class="hud-status"><span class="dot"></span>SERVIDOR ATIVO <span style="color:var(--grn-dim)">v10</span><br><span id="hud-phase">DRAFT PHASE</span></div>
+  <div class="hud-status"><span class="dot"></span>SERVIDOR ATIVO <span style="color:var(--grn-dim)">v11</span><br><span id="hud-phase">DRAFT PHASE</span></div>
 </div>
 <div class="cs-pad">
 <div id="s-draft" class="screen active">
@@ -516,11 +516,11 @@ const SPEEDS={lento:350,medio:160,rapido:55};
 let CFG={mode:'manual',speed:'medio'};
 let LIVE=false;
 let SKIP=false; // quando true, a animação corre instantânea até o fim
-let PENDING_FINALIZE=null; // finalize da partida atual, pode ser forçado pelo skip
+let PENDING_FINALIZE=null; // finalize da partida atual, forçado pelo botão Pular
 function skipMatch(){
   SKIP=true;
-  // garante que, mesmo se a animação não terminar sozinha, o resultado apareça
-  setTimeout(()=>{ if(typeof PENDING_FINALIZE==='function'){LIVE=false;PENDING_FINALIZE();} },300);
+  // garante o resultado mesmo se a animação não terminar sozinha
+  setTimeout(()=>{ if(typeof PENDING_FINALIZE==='function')PENDING_FINALIZE(); },250);
 }
 
 /* ===================== ÁUDIO ===================== */
@@ -813,24 +813,11 @@ async function resolveSwiss(oppId){
   else if(ps.losses>=3){bannerHtml=`<div class="res-banner loss"><h2><i class="ti ti-bomb"></i> ELIMINADO</h2><p>Fim da linha na Fase Suíça (${ps.wins}V-${ps.losses}D)</p></div>`;btnHtml=`<button class="btn btn-p" onclick="showCampaignEnd(false)"><i class="ti ti-list"></i> Ver Resumo da Campanha</button> <button class="btn btn-s" onclick="restartAll()"><i class="ti ti-refresh"></i> Novo Draft</button>`;}
   else{bannerHtml='';btnHtml=`<button class="btn btn-p" onclick="renderSwiss()">Próxima Rodada <i class="ti ti-arrow-right"></i></button>`;autoNext=()=>renderSwiss();}
 
-  let finalized=false;
-  const finalize=()=>{
-    if(finalized)return;finalized=true;
-    PENDING_FINALIZE=null;
-    try{ injectButtons('swiss-content',bannerHtml,btnHtml,CFG.mode==='manual'); }catch(e){ console.error('injectButtons falhou:',e); }
-    try{ const elSkip=document.getElementById('lv-skip'); if(elSkip)elSkip.remove(); }catch(e){}
+  runSeriesAndFinish(res,opp,1,()=>{
+    try{ injectButtons('swiss-content',bannerHtml,btnHtml,CFG.mode==='manual'); }catch(e){console.error(e);}
     try{ if(won)sfx.win();else sfx.loss(); if(ps.losses>=3)sfx.c4(); }catch(e){}
-    try{ if(CFG.mode==='auto'&&autoNext)setTimeout(()=>{if(!LIVE)autoNext();},SPEEDS[CFG.speed]*4); }catch(e){}
-  };
-  PENDING_FINALIZE=finalize;
-
-  const totalRounds=res.maps.reduce((a,m)=>a+m.seq.length,0);
-  const maxMs=totalRounds*SPEEDS[CFG.speed]+4000;
-  const watchdog=setTimeout(()=>{ if(!finalized){console.warn('watchdog suíça');LIVE=false;finalize();} },maxMs);
-  try{ await playSeriesLive(res,opp,1); }
-  catch(e){ console.error('Erro na animação (suíça):',e); LIVE=false; }
-  clearTimeout(watchdog);
-  finalize();
+    if(CFG.mode==='auto'&&autoNext)setTimeout(()=>{if(!LIVE)autoNext();},SPEEDS[CFG.speed]*4);
+  });
 }
 
 /* ===================== PLAYOFFS ===================== */
@@ -866,6 +853,25 @@ function renderPO(stageName,stageKey){
   if(CFG.mode==='auto')setTimeout(()=>{if(!LIVE)resolvePO(opp.id,stageName,stageKey);},SPEEDS[CFG.speed]*3);
 }
 
+/* Roda a animação de uma série e GARANTE que o callback de finalização rode,
+   não importa se a animação termina, trava, ou dá erro.
+   - callback roda no fim normal da animação
+   - OU quando o usuário clica em Pular (via PENDING_FINALIZE)
+   - OU via watchdog curto (4s + tempo estimado) como última garantia */
+function runSeriesAndFinish(res,opp,bo,onDone){
+  let done=false;
+  const finish=()=>{ if(done)return;done=true;PENDING_FINALIZE=null;LIVE=false;
+    try{const elSkip=document.getElementById('lv-skip');if(elSkip)elSkip.remove();}catch(e){}
+    try{onDone();}catch(e){console.error('onDone erro:',e);}
+  };
+  PENDING_FINALIZE=finish; // o botão Pular chama isto
+  const totalRounds=res.maps.reduce((a,m)=>a+m.seq.length,0);
+  const estMs=totalRounds*SPEEDS[CFG.speed]+res.maps.length*SPEEDS[CFG.speed]*3+2000;
+  const watchdog=setTimeout(finish,estMs); // se a animação não terminar no tempo estimado, finaliza
+  // roda a animação (não bloqueia; quando terminar, chama finish)
+  playSeriesLive(res,opp,bo).then(()=>{clearTimeout(watchdog);finish();}).catch(e=>{console.error('anim erro:',e);clearTimeout(watchdog);finish();});
+}
+
 async function resolvePO(oppId,stageName,stageKey){
   if(LIVE)return;
   const opp=G.playoffPool.find(t=>t.id===oppId)||G.bracket.find(t=>t.id===oppId)||{name:'Adversário',country:'🌍',rating:88,players:[]};
@@ -874,7 +880,6 @@ async function resolvePO(oppId,stageName,stageKey){
   const cont=document.getElementById('playoffs-content');
   cont.innerHTML=`<div id="topslot"></div><div class="match-stage">${stageName} // ${isFinal?'BO5':'BO3'} // ${flag(opp.country)} ${opp.name}</div>${renderVeto(res,bo)}${buildBoardShell(opp,stageName,bo)}<div class="btn-row" id="postmatch"></div>`;
 
-  // ===== calcula resultado e botões JÁ, antes de animar =====
   G.history.push({stage:stageName,bo,opp:opp.name,oppCountry:opp.country,won,score:`${res.wA}-${res.wB}`,scoreA:res.wA,scoreB:res.wB,maps:res.maps.map(m=>({name:m.mapName,a:m.mA,b:m.mB,ot:m.ot,won:m.winner==='A'}))});
   let bannerHtml='',btnHtml='',autoNext=null;
   if(!won){bannerHtml=`<div class="res-banner loss"><h2><i class="ti ti-bomb"></i> ELIMINADO</h2><p>Derrota para ${opp.name} na ${stageName} (${res.wA}-${res.wB})</p></div>`;btnHtml=`<button class="btn btn-p" onclick="showCampaignEnd(false)"><i class="ti ti-list"></i> Ver Resumo da Campanha</button> <button class="btn btn-s" onclick="restartAll()"><i class="ti ti-refresh"></i> Novo Draft</button>`;}
@@ -884,31 +889,12 @@ async function resolvePO(oppId,stageName,stageKey){
     if(!next[stageKey]){bannerHtml=`<div class="res-banner win"><h2><i class="ti ti-trophy"></i> CAMPEÃO DO MAJOR</h2><p>Sua lineup conquistou o título! GGWP 🏆</p></div>`;btnHtml=`<button class="btn btn-p" onclick="showCampaignEnd(true)"><i class="ti ti-list"></i> Ver Resumo da Campanha</button>`;}
     else{bannerHtml=`<div class="res-banner win"><h2><i class="ti ti-check"></i> VITÓRIA</h2><p>Avançou para a ${next[stageKey].n} (${res.wA}-${res.wB})</p></div>`;btnHtml=`<button class="btn btn-p" onclick="renderPO('${next[stageKey].n}','${next[stageKey].k}')">Avançar para ${next[stageKey].n} <i class="ti ti-arrow-right"></i></button>`;autoNext=()=>renderPO(next[stageKey].n,next[stageKey].k);}
   }
-  // função que finaliza: toca som, injeta botões. Roda no fim da animação OU via watchdog.
-  let finalized=false;
-  const finalize=()=>{
-    if(finalized)return;finalized=true;
-    PENDING_FINALIZE=null;
-    // 1) BOTÕES PRIMEIRO — nada pode impedir que apareçam
-    try{ injectButtons('playoffs-content',bannerHtml,btnHtml,CFG.mode==='manual'); }catch(e){ console.error('injectButtons falhou:',e); }
-    // 2) remove o skip
-    try{ const elSkip=document.getElementById('lv-skip'); if(elSkip)elSkip.remove(); }catch(e){}
-    // 3) som (se falhar, não afeta os botões)
+  // animação roda em paralelo, SEM bloquear a aparição dos botões
+  runSeriesAndFinish(res,opp,bo,()=>{
+    try{ injectButtons('playoffs-content',bannerHtml,btnHtml,CFG.mode==='manual'); }catch(e){console.error(e);}
     try{ if(won)sfx.win();else sfx.c4(); }catch(e){}
-    // 4) auto-avanço
-    try{ if(CFG.mode==='auto'&&autoNext)setTimeout(()=>{if(!LIVE)autoNext();},SPEEDS[CFG.speed]*4); }catch(e){}
-  };
-  PENDING_FINALIZE=finalize;
-
-  // anima; se travar/explodir, o watchdog finaliza
-  // watchdog: tempo máximo = rounds totais estimados * velocidade + folga. Se estourar, finaliza à força.
-  const totalRounds=res.maps.reduce((a,m)=>a+m.seq.length,0);
-  const maxMs=totalRounds*SPEEDS[CFG.speed]+res.maps.length*SPEEDS[CFG.speed]*3+4000;
-  const watchdog=setTimeout(()=>{ if(!finalized){console.warn('watchdog: animação não terminou, finalizando à força');LIVE=false;finalize();} },maxMs);
-  try{ await playSeriesLive(res,opp,bo); }
-  catch(e){ console.error('Erro na animação (playoffs):',e); LIVE=false; }
-  clearTimeout(watchdog);
-  finalize();
+    if(CFG.mode==='auto'&&autoNext)setTimeout(()=>{if(!LIVE)autoNext();},SPEEDS[CFG.speed]*4);
+  });
 }
 
 /* ===================== RESUMO DA CAMPANHA ===================== */
