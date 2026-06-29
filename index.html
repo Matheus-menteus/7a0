@@ -336,7 +336,7 @@ body { background-color: #050608; display: flex; justify-content: center; paddin
 <div class="cs-root">
 <div class="hud-head">
   <div class="hud-logo disp"><i class="ti ti-crosshair"></i>CS:MAJOR<span class="sub">// 7a0 DRAFT</span></div>
-  <div class="hud-status"><span class="dot"></span>SERVIDOR ATIVO <span style="color:var(--grn-dim)">v13</span><br><span id="hud-phase">DRAFT PHASE</span></div>
+  <div class="hud-status"><span class="dot"></span>SERVIDOR ATIVO <span style="color:var(--grn-dim)">v15</span><br><span id="hud-phase">DRAFT PHASE</span></div>
 </div>
 <div class="cs-pad">
 <div id="s-draft" class="screen active">
@@ -806,21 +806,18 @@ async function resolveSwiss(oppId){
 function injectButtons(containerId,bannerHtml,btnHtml,doScroll){
   const cont=document.getElementById(containerId);
   if(!cont)return;
-  // garante botão de emergência sempre presente
   const safeBtns=btnHtml+` <button class="btn btn-ghost-em" onclick="restartAll()" title="Recomeçar do zero"><i class="ti ti-refresh"></i></button>`;
-  let top=document.getElementById('topslot');
-  if(!top){ // recria no topo do container
-    cont.insertAdjacentHTML('afterbegin','<div id="topslot"></div>');
-    top=document.getElementById('topslot');
-  }
+  // BUSCA DENTRO DO CONTAINER (não global) — os IDs topslot/postmatch existem em várias telas
+  let top=cont.querySelector('#topslot');
+  if(!top){ cont.insertAdjacentHTML('afterbegin','<div id="topslot"></div>'); top=cont.querySelector('#topslot'); }
   if(top)top.innerHTML=bannerHtml+`<div class="btn-row" style="margin-bottom:16px">${safeBtns}</div>`;
-  let post=document.getElementById('postmatch');
-  if(!post){cont.insertAdjacentHTML('beforeend','<div class="btn-row" id="postmatch"></div>');post=document.getElementById('postmatch');}
+  let post=cont.querySelector('#postmatch');
+  if(!post){ cont.insertAdjacentHTML('beforeend','<div class="btn-row" id="postmatch"></div>'); post=cont.querySelector('#postmatch'); }
   if(post)post.innerHTML=safeBtns;
   if(doScroll&&top){try{top.scrollIntoView({behavior:'smooth',block:'start'});}catch(e){}}
 }
 
-function startPlayoffs(){LIVE=false;SKIP=true;const adv=Object.values(G.swiss).filter(s=>s.wins>=3&&s.team.id!=='myteam').map(s=>s.team);const pool=adv.length>=7?adv.slice(0,7):[...adv,...G.bracket.filter(b=>!adv.includes(b))].slice(0,7);G.playoffPool=[G.myTeam,...pool];G._poPlayed=[];showScreen('s-playoffs');renderPO('Quartas de Final','qf');}
+function startPlayoffs(){LIVE=false;SKIP=true;const sc=document.getElementById('swiss-content');if(sc)sc.innerHTML='';const adv=Object.values(G.swiss).filter(s=>s.wins>=3&&s.team.id!=='myteam').map(s=>s.team);const pool=adv.length>=7?adv.slice(0,7):[...adv,...G.bracket.filter(b=>!adv.includes(b))].slice(0,7);G.playoffPool=[G.myTeam,...pool];G._poPlayed=[];showScreen('s-playoffs');renderPO('Quartas de Final','qf');}
 function getOpp(ex=[]){const pool=G.playoffPool.filter(t=>t.id!=='myteam'&&!ex.includes(t.id));return pool[Math.floor(Math.random()*pool.length)]||G.bracket[0];}
 
 function renderPO(stageName,stageKey){
@@ -841,38 +838,45 @@ async function resolvePO(oppId,stageName,stageKey){
   const cont=document.getElementById('playoffs-content');
   cont.innerHTML=`<div id="topslot"></div><div class="match-stage">${stageName} // ${isFinal?'BO5':'BO3'} // ${flag(opp.country)} ${opp.name}</div>${renderVeto(res,bo)}${buildBoardShell(opp,stageName,bo)}<div class="btn-row" id="postmatch"></div>`;
 
-  G.history.push({stage:stageName,bo,opp:opp.name,oppCountry:opp.country,won,score:`${res.wA}-${res.wB}`,scoreA:res.wA,scoreB:res.wB,maps:res.maps.map(m=>({name:m.mapName,a:m.mA,b:m.mB,ot:m.ot,won:m.winner==='A'}))});
   let bannerHtml='',btnHtml='',autoNext=null;
-  if(!won){bannerHtml=`<div class="res-banner loss"><h2><i class="ti ti-bomb"></i> ELIMINADO</h2><p>Derrota para ${opp.name} na ${stageName} (${res.wA}-${res.wB})</p></div>`;btnHtml=`<button class="btn btn-p" onclick="showCampaignEnd(false)"><i class="ti ti-list"></i> Ver Resumo da Campanha</button> <button class="btn btn-s" onclick="restartAll()"><i class="ti ti-refresh"></i> Novo Draft</button>`;}
-  else{
-    G._poPlayed.push(oppId);
-    const next={qf:{n:'Semifinal',k:'sf'},sf:{n:'Grande Final',k:'final'}};
-    if(!next[stageKey]){bannerHtml=`<div class="res-banner win"><h2><i class="ti ti-trophy"></i> CAMPEÃO DO MAJOR</h2><p>Sua lineup conquistou o título! GGWP 🏆</p></div>`;btnHtml=`<button class="btn btn-p" onclick="showCampaignEnd(true)"><i class="ti ti-list"></i> Ver Resumo da Campanha</button>`;}
-    else{bannerHtml=`<div class="res-banner win"><h2><i class="ti ti-check"></i> VITÓRIA</h2><p>Avançou para a ${next[stageKey].n} (${res.wA}-${res.wB})</p></div>`;btnHtml=`<button class="btn btn-p" onclick="renderPO('${next[stageKey].n}','${next[stageKey].k}')">Avançar para ${next[stageKey].n} <i class="ti ti-arrow-right"></i></button>`;autoNext=()=>renderPO(next[stageKey].n,next[stageKey].k);}
+  try{
+    if(!Array.isArray(G._poPlayed))G._poPlayed=[];
+    G.history.push({stage:stageName,bo,opp:opp.name,oppCountry:opp.country,won,score:`${res.wA}-${res.wB}`,scoreA:res.wA,scoreB:res.wB,maps:res.maps.map(m=>({name:m.mapName,a:m.mA,b:m.mB,ot:m.ot,won:m.winner==='A'}))});
+    if(!won){bannerHtml=`<div class="res-banner loss"><h2><i class="ti ti-bomb"></i> ELIMINADO</h2><p>Derrota para ${opp.name} na ${stageName} (${res.wA}-${res.wB})</p></div>`;btnHtml=`<button class="btn btn-p" onclick="showCampaignEnd(false)"><i class="ti ti-list"></i> Ver Resumo da Campanha</button> <button class="btn btn-s" onclick="restartAll()"><i class="ti ti-refresh"></i> Novo Draft</button>`;}
+    else{
+      G._poPlayed.push(oppId);
+      const next={qf:{n:'Semifinal',k:'sf'},sf:{n:'Grande Final',k:'final'}};
+      if(!next[stageKey]){bannerHtml=`<div class="res-banner win"><h2><i class="ti ti-trophy"></i> CAMPEÃO DO MAJOR</h2><p>Sua lineup conquistou o título! GGWP 🏆</p></div>`;btnHtml=`<button class="btn btn-p" onclick="showCampaignEnd(true)"><i class="ti ti-list"></i> Ver Resumo da Campanha</button>`;}
+      else{bannerHtml=`<div class="res-banner win"><h2><i class="ti ti-check"></i> VITÓRIA</h2><p>Avançou para a ${next[stageKey].n} (${res.wA}-${res.wB})</p></div>`;btnHtml=`<button class="btn btn-p" onclick="renderPO('${next[stageKey].n}','${next[stageKey].k}')">Avançar para ${next[stageKey].n} <i class="ti ti-arrow-right"></i></button>`;autoNext=()=>renderPO(next[stageKey].n,next[stageKey].k);}
+    }
+  }catch(e){
+    console.error('Erro ao montar resultado dos playoffs:',e);
+    // fallback: botões de emergência garantidos
+    bannerHtml=`<div class="res-banner ${won?'win':'loss'}"><h2>${won?'VITÓRIA':'ELIMINADO'}</h2><p>${res.wA}-${res.wB} vs ${opp.name}</p></div>`;
+    btnHtml=won?`<button class="btn btn-p" onclick="renderPO('Semifinal','sf')">Continuar <i class="ti ti-arrow-right"></i></button>`:`<button class="btn btn-p" onclick="restartAll()">Novo Draft</button>`;
   }
   playMatchFlow({res,opp,bo,won,bannerHtml,btnHtml,autoNext,contId:'playoffs-content',loseSound:true});
 }
 
-/* Fluxo unificado e à prova de falhas:
-   1) Injeta botões + resultado IMEDIATAMENTE (síncrono) — antes de qualquer animação.
-   2) Roda a animação como decoração. Se travar ou falhar, os botões JÁ estão lá.
-   3) O botão "Pular" só acelera a animação (não precisa mais "salvar" os botões). */
+/* Fluxo unificado À PROVA DE FALHAS:
+   - injeta o banner+botões IMEDIATAMENTE (síncrono), antes de qualquer animação.
+   - a animação roda DEPOIS, em paralelo, apenas como decoração do placar.
+   - se a animação travar/falhar, não importa: os botões já estão na tela e funcionam. */
 function playMatchFlow({res,opp,bo,won,bannerHtml,btnHtml,autoNext,contId,loseSound}){
-  // (1) RESULTADO + BOTÕES JÁ — síncrono, sem await, impossível travar
+  // (1) BOTÕES + RESULTADO JÁ — sem await, sem Promise, impossível travar
   try{ injectButtons(contId,bannerHtml,btnHtml,false); }catch(e){console.error('injectButtons:',e);}
   try{ if(won)sfx.win();else (loseSound?sfx.c4():sfx.loss()); }catch(e){}
-  if(CFG.mode==='auto'&&autoNext)setTimeout(()=>{if(!LIVE)autoNext();},SPEEDS[CFG.speed]*4);
+  if(CFG.mode==='auto'&&autoNext)setTimeout(()=>{if(!LIVE)autoNext();},SPEEDS[CFG.speed]*5);
 
-  // (2) animação decorativa — atualiza placar ao vivo por cima; pode falhar sem consequência
-  let animDone=false;
-  const cleanup=()=>{ if(animDone)return;animDone=true;PENDING_FINALIZE=null;LIVE=false;
+  // (2) animação decorativa em paralelo (não bloqueia nada)
+  let cleaned=false;
+  const cleanup=()=>{ if(cleaned)return;cleaned=true;PENDING_FINALIZE=null;LIVE=false;
     try{const elSkip=document.getElementById('lv-skip');if(elSkip)elSkip.remove();}catch(e){}
   };
-  PENDING_FINALIZE=cleanup;
+  PENDING_FINALIZE=cleanup; // botão Pular limpa
   try{
     playSeriesLive(res,opp,bo).then(cleanup).catch(e=>{console.error('anim:',e);cleanup();});
-  }catch(e){ console.error('anim sync:',e); cleanup(); }
-  // se a animação demorar demais, limpa o skip mesmo assim
+  }catch(e){ console.error('anim sync:',e);cleanup(); }
   const totalRounds=res.maps.reduce((a,m)=>a+m.seq.length,0);
   setTimeout(cleanup, totalRounds*SPEEDS[CFG.speed]+res.maps.length*SPEEDS[CFG.speed]*2+3000);
 }
