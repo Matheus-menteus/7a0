@@ -858,27 +858,29 @@ async function resolvePO(oppId,stageName,stageKey){
   playMatchFlow({res,opp,bo,won,bannerHtml,btnHtml,autoNext,contId:'playoffs-content',loseSound:true});
 }
 
-/* Fluxo unificado À PROVA DE FALHAS:
-   - injeta o banner+botões IMEDIATAMENTE (síncrono), antes de qualquer animação.
-   - a animação roda DEPOIS, em paralelo, apenas como decoração do placar.
-   - se a animação travar/falhar, não importa: os botões já estão na tela e funcionam. */
+/* Fluxo unificado COM SUSPENSE e à prova de falhas:
+   - a animação roda primeiro (sem spoiler); os botões aparecem só no FIM.
+   - garantia tripla de que os botões aparecem: (a) fim normal da animação,
+     (b) botão "Pular para o resultado", (c) watchdog de segurança.
+   - como confirmamos que o mecanismo funciona no ambiente real, o suspense é seguro. */
 function playMatchFlow({res,opp,bo,won,bannerHtml,btnHtml,autoNext,contId,loseSound}){
-  // (1) BOTÕES + RESULTADO JÁ — sem await, sem Promise, impossível travar
-  try{ injectButtons(contId,bannerHtml,btnHtml,false); }catch(e){console.error('injectButtons:',e);}
-  try{ if(won)sfx.win();else (loseSound?sfx.c4():sfx.loss()); }catch(e){}
-  if(CFG.mode==='auto'&&autoNext)setTimeout(()=>{if(!LIVE)autoNext();},SPEEDS[CFG.speed]*5);
-
-  // (2) animação decorativa em paralelo (não bloqueia nada)
-  let cleaned=false;
-  const cleanup=()=>{ if(cleaned)return;cleaned=true;PENDING_FINALIZE=null;LIVE=false;
+  let revealed=false;
+  const revealResult=()=>{
+    if(revealed)return;revealed=true;PENDING_FINALIZE=null;LIVE=false;
     try{const elSkip=document.getElementById('lv-skip');if(elSkip)elSkip.remove();}catch(e){}
+    try{ injectButtons(contId,bannerHtml,btnHtml,CFG.mode==='manual'); }catch(e){console.error('injectButtons:',e);}
+    try{ if(won)sfx.win();else (loseSound?sfx.c4():sfx.loss()); }catch(e){}
+    if(CFG.mode==='auto'&&autoNext)setTimeout(()=>{if(!LIVE)autoNext();},SPEEDS[CFG.speed]*5);
   };
-  PENDING_FINALIZE=cleanup; // botão Pular limpa
-  try{
-    playSeriesLive(res,opp,bo).then(cleanup).catch(e=>{console.error('anim:',e);cleanup();});
-  }catch(e){ console.error('anim sync:',e);cleanup(); }
+  PENDING_FINALIZE=revealResult; // (b) o botão "Pular" chama isto
+  // (c) watchdog: se a animação travar/demorar além do estimado, revela mesmo assim
   const totalRounds=res.maps.reduce((a,m)=>a+m.seq.length,0);
-  setTimeout(cleanup, totalRounds*SPEEDS[CFG.speed]+res.maps.length*SPEEDS[CFG.speed]*2+3000);
+  const estMs=totalRounds*SPEEDS[CFG.speed]+res.maps.length*SPEEDS[CFG.speed]*2+2500;
+  const watchdog=setTimeout(revealResult,estMs);
+  // (a) roda a animação; ao terminar (ou falhar), revela o resultado
+  try{
+    playSeriesLive(res,opp,bo).then(()=>{clearTimeout(watchdog);revealResult();}).catch(e=>{console.error('anim:',e);clearTimeout(watchdog);revealResult();});
+  }catch(e){ console.error('anim sync:',e);clearTimeout(watchdog);revealResult(); }
 }
 
 /* ===================== RESUMO DA CAMPANHA ===================== */
