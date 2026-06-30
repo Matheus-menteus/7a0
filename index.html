@@ -68,6 +68,18 @@ body { background-color: #050608; display: flex; justify-content: center; paddin
 .slot-empty { font-size: 16px; color: var(--txt3); margin: 10px 0; }
 
 .ovr-strip { display: flex; align-items: center; gap: 14px; padding: 12px 18px; background: var(--bg2); border: 1px solid var(--line); border-radius: 6px; margin-bottom: 20px; }
+/* MODO HARD toggle */
+.hard-toggle { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:11px 16px; background:var(--bg2); border:1px solid var(--line); border-radius:6px; margin-bottom:12px; transition:all .2s; }
+.hard-toggle.on { border-color:var(--amber); background:var(--amber-bg); }
+.hard-toggle .ht-info { font-size:12px; color:var(--txt2); display:flex; align-items:center; gap:6px; }
+.hard-toggle .ht-info b { color:var(--txt); }
+.hard-toggle .ht-info span { color:var(--txt3); font-size:11px; }
+.hard-toggle.on .ht-info i { color:var(--amber); }
+.ht-switch { position:relative; width:42px; height:23px; border-radius:12px; background:var(--bg3); border:1px solid var(--line2); cursor:pointer; flex-shrink:0; transition:all .2s; padding:0; }
+.ht-switch.on { background:var(--amber); border-color:var(--amber); }
+.ht-switch:disabled { opacity:.4; cursor:not-allowed; }
+.ht-knob { position:absolute; top:2px; left:2px; width:17px; height:17px; border-radius:50%; background:#fff; transition:all .2s; }
+.ht-switch.on .ht-knob { left:21px; }
 .ovr-strip .lbl { font-size: 11px; color: var(--txt2); letter-spacing: 0.1em; text-transform: uppercase; font-weight: 700;}
 .ovr-track { flex: 1; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
 .ovr-fill { height: 100%; background: linear-gradient(90deg, var(--grn-dim), var(--grn)); border-radius: 3px; transition: width .5s; box-shadow: 0 0 10px rgba(46,204,113,.5); }
@@ -336,11 +348,12 @@ body { background-color: #050608; display: flex; justify-content: center; paddin
 <div class="cs-root">
 <div class="hud-head">
   <div class="hud-logo disp"><i class="ti ti-crosshair"></i>CS:MAJOR<span class="sub">// 7a0 DRAFT</span></div>
-  <div class="hud-status"><span class="dot"></span>SERVIDOR ATIVO <span style="color:var(--grn-dim)">v15</span><br><span id="hud-phase">DRAFT PHASE</span></div>
+  <div class="hud-status"><span class="dot"></span>SERVIDOR ATIVO <span style="color:var(--grn-dim)">v16</span><br><span id="hud-phase">DRAFT PHASE</span></div>
 </div>
 <div class="cs-pad">
 <div id="s-draft" class="screen active">
   <div class="slots-bar" id="slots"></div>
+  <div id="hard-toggle-wrap"></div>
   <div class="ovr-strip"><span class="lbl">Seu Rating Geral</span><div class="ovr-track"><div class="ovr-fill" id="ovr-fill" style="width:0%"></div></div><span class="ovr-num" id="ovr-num">—</span></div>
   <div class="dice-zone"><div class="dice" id="dice" onclick="rollDice()">⚄</div><div class="dice-hint" id="dice-hint">clique para sortear lineup</div></div>
   <div id="lineup-reveal"></div>
@@ -479,6 +492,55 @@ const LINEUPS=[
     {name:'TeSeS',roles:{Support:84,Lurker:83},note:'Suporte clutch, versátil'},
     {name:'kyousuke',roles:{Lurker:83,Entry:82},note:'Lurker japonês surpresa'},
   ]},
+  {id:'heroic22',name:'Heroic',era:'2022',country:'🇩🇰',rating:89,style:'#1 do mundo 2022, dinamarqueses sólidos',players:[
+    {name:'cadiaN',roles:{IGL:85,AWPer:84},note:'IGL-AWPer, líder vocal e clutch'},
+    {name:'stavn',roles:{Lurker:91,Entry:88},note:'Melhor jogador da Heroic, versátil'},
+    {name:'TeSeS',roles:{Entry:87,Support:84},note:'Entry consistente dinamarquês'},
+    {name:'sjuush',roles:{Support:82},note:'Suporte confiável'},
+    {name:'jabbi',roles:{Entry:85,Lurker:83},note:'Rifler jovem agressivo'},
+  ]},
+  {id:'liquid19',name:'Team Liquid',era:'2019',country:'🇺🇸',rating:91,style:'Grand Slam — melhor time NA da história',players:[
+    {name:'EliGE',roles:{Entry:94,Lurker:90},note:'Motor da Liquid, top 3 mundial 2019'},
+    {name:'NAF',roles:{Lurker:90,Support:87},note:'Rifler consistente, clutch frio'},
+    {name:'Twistzz',roles:{Entry:91,Lurker:88},note:'Aim impecável, one-taps cirúrgicos'},
+    {name:'nitr0',roles:{IGL:83},note:'IGL do Grand Slam'},
+    {name:'Stewie2K',roles:{Support:85,Entry:83},note:'Hybrid energético, clutches'},
+  ]},
+  {id:'g2_25',name:'G2',era:'2024-25',country:'🌍',rating:92,style:'Super dupla m0NESY + NiKo',players:[
+    {name:'NiKo',roles:{Entry:95,Lurker:91},note:'Rifler GOAT, liderança por exemplo'},
+    {name:'m0NESY',roles:{AWPer:97},note:'Melhor AWPer jovem do mundo'},
+    {name:'huNter-',roles:{Entry:88,Lurker:86},note:'Rifler explosivo, primo do NiKo'},
+    {name:'malbsMd',roles:{Support:85,Entry:84},note:'Suporte guatemalteco talentoso'},
+    {name:'Snax',roles:{IGL:80,Lurker:82},note:'Lenda polonesa como IGL'},
+  ]},
+  {id:'mouz25',name:'MOUZ',era:'2024-25',country:'🌍',rating:88,style:'Geração nova, projeto jovem da MOUZ',players:[
+    {name:'Jimpphat',roles:{Entry:90,Lurker:87},note:'Prodígio finlandês, fragger nato'},
+    {name:'torzsi',roles:{AWPer:88},note:'AWPer húngaro consistente'},
+    {name:'xertioN',roles:{Entry:87,Lurker:85},note:'Rifler israelense agressivo'},
+    {name:'Brollan',roles:{Lurker:86,Support:84},note:'Sueco veterano e versátil'},
+    {name:'Spinx',roles:{Support:85,Lurker:84},note:'IGL improvável, suporte clutch'},
+  ]},
+  {id:'ence19',name:'ENCE',era:'2019',country:'🇫🇮',rating:84,style:'Vice de Katowice, cinderela finlandesa',players:[
+    {name:'allu',roles:{AWPer:86},note:'AWPer veterano, capitão experiente'},
+    {name:'Aerial',roles:{Entry:84,Lurker:82},note:'Rifler sólido'},
+    {name:'sergej',roles:{Entry:88,Lurker:86},note:'Estrela jovem da ENCE'},
+    {name:'Aleksib',roles:{IGL:82},note:'IGL cerebral, mente do time'},
+    {name:'xseveN',roles:{Support:81},note:'Suporte sacrificial'},
+  ]},
+  {id:'faze18',name:'FaZe Clan',era:'2017-18',country:'🌍',rating:91,style:'Super team original — NiKo + GuardiaN',players:[
+    {name:'NiKo',roles:{Entry:96,Lurker:92},note:'Pico mecânico, carregava o time'},
+    {name:'GuardiaN',roles:{AWPer:92},note:'AWPer eslovaco no auge'},
+    {name:'rain',roles:{Entry:88,Support:85},note:'Entry veterano norueguês'},
+    {name:'olofmeister',roles:{Lurker:88,Entry:86},note:'Lenda sueca na FaZe'},
+    {name:'karrigan',roles:{IGL:84},note:'IGL do super team'},
+  ]},
+  {id:'immortals17',name:'Immortals',era:'2017',country:'🇧🇷',rating:82,style:'Vice de Krakow, campanha mágica BR',players:[
+    {name:'HEN1',roles:{AWPer:86,Entry:83},note:'AWPer gêmeo, clutch na campanha'},
+    {name:'LUCAS1',roles:{Entry:84,Lurker:82},note:'Rifler gêmeo agressivo'},
+    {name:'kNgV-',roles:{Entry:87,Lurker:84},note:'Estrela explosiva e polêmica'},
+    {name:'steel',roles:{IGL:81,Lurker:80},note:'IGL criativo'},
+    {name:'boltz',roles:{Support:83,Lurker:82},note:'Suporte versátil, foi pra SK depois'},
+  ]},
 ];
 
 const PLAYER_HL={
@@ -508,13 +570,23 @@ const PLAYER_HL={
   'rain':[['ti-flame','<b>rain</b> entrada veterana abriu o bombsite']],
   'NEO':[['ti-bulb','<b>NEO</b> mostrou o IQ lendário num clutch impossível']],
   'Snax':[['ti-bomb','<b>Snax</b> jogada criativa de utility abriu o round']],
+  'EliGE':[['ti-flame','<b>EliGE</b> spray transfer monstruoso segurando o site sozinho'],['ti-flame','<b>EliGE</b> abriu 3 no T side e destravou a rodada']],
+  'Twistzz':[['ti-target','<b>Twistzz</b> one-tap cirúrgico de AK na cabeça'],['ti-target','<b>Twistzz</b> dois HS limpos no retake']],
+  'NAF':[['ti-device-gamepad-2','<b>NAF</b> clutch 1v2 com aquela frieza canadense'],['ti-eye','<b>NAF</b> leu a rotação e pegou o flanco']],
+  'stavn':[['ti-flame','<b>stavn</b> mostrou por que é o melhor da Heroic'],['ti-target','<b>stavn</b> flick perfeito no entry adversário']],
+  'GuardiaN':[['ti-crosshair','<b>GuardiaN</b> AWP no auge, peek agressivo pegou 2'],['ti-crosshair','<b>GuardiaN</b> no-scope clutch que parou a arena']],
+  'huNter-':[['ti-flame','<b>huNter-</b> spray explosivo abriu o bombsite'],['ti-flame','<b>huNter-</b> trade frag instantâneo no entry']],
+  'Jimpphat':[['ti-flame','<b>Jimpphat</b> prodígio finlandês fez um 4K no retake'],['ti-target','<b>Jimpphat</b> aim absurdo pra idade dele']],
+  'sergej':[['ti-flame','<b>sergej</b> a estrela da ENCE carregou a rodada'],['ti-target','<b>sergej</b> spray transfer impecável']],
+  'kNgV-':[['ti-flame','<b>kNgV-</b> entrada explosiva que abriu o site'],['ti-crosshair','<b>kNgV-</b> highlight de AWP no peek agressivo']],
+  'HEN1':[['ti-crosshair','<b>HEN1</b> clutch de AWP na campanha mágica'],['ti-crosshair','<b>HEN1</b> pescou 2 de AWP no pré-plant']],
 };
 const GENERIC_HL=[['ti-device-gamepad-2','<b>{p}</b> segurou um clutch importante no pós-plant'],['ti-flame','<b>{p}</b> abriu o round com um opening kill limpo'],['ti-flame','<b>{p}</b> trade frag rápido manteve o time no round'],['ti-bomb','<b>{p}</b> jogou a HE perfeita e pegou 2 no dano'],['ti-eye','<b>{p}</b> fez a leitura certa e parou o rush adversário']];
 
 /* ===================== ESTADO ===================== */
 let G={slots:{IGL:null,AWPer:null,Entry:null,Support:null,Lurker:null},usedL:new Set(),takenP:new Set(),curL:null,pick:null,swiss:{},swRound:1,swWins:0,swLosses:0,myOvr:0,myTeam:null,bracket:[],history:[]};
 const SPEEDS={lento:350,medio:160,rapido:55};
-let CFG={mode:'manual',speed:'medio'};
+let CFG={mode:'manual',speed:'medio',hard:false};
 let LIVE=false;
 let SKIP=false; // quando true, a animação corre instantânea até o fim
 let PENDING_FINALIZE=null; // finalize da partida atual, forçado pelo botão Pular
@@ -570,20 +642,39 @@ function availRolesFor(p){const empty=ROLES.filter(r=>!G.slots[r]);return Object
 
 /* ===================== DRAFT ===================== */
 function renderSlots(){
-  document.getElementById('slots').innerHTML=ROLES.map(r=>{const p=G.slots[r];return p?`<div class="slot filled"><div class="slot-role">${wepIcon(r)} ${r}</div><div class="slot-name">${flag(p._country)} ${p.name}</div><div class="slot-from">${p._from}</div><div class="slot-ovr" style="color:${ovrColor(p.ovr)}">${p.ovr}</div></div>`:`<div class="slot"><div class="slot-role">${wepIcon(r)} ${r}</div><div class="slot-empty">—</div><div style="font-size:9px;color:var(--txt3);">Vazio</div></div>`;}).join('');
-  const f=Object.values(G.slots).filter(Boolean);const ovr=f.length?Math.round(f.reduce((a,p)=>a+p.ovr,0)/f.length):0;
-  document.getElementById('ovr-fill').style.width=(ovr||0)+'%';document.getElementById('ovr-num').textContent=ovr||'—';setPhase(`DRAFT ${f.length}/5`);
-  document.getElementById('draft-btns').innerHTML=f.length===5?`<button class="btn btn-p" onclick="startMajor()"><i class="ti ti-player-play"></i> Entrar no Major (OVR ${ovr})</button>`:'';
+  const f=Object.values(G.slots).filter(Boolean);
+  const complete=f.length===5;
+  const hideOvr=CFG.hard&&!complete; // no modo hard, esconde até fechar o time
+  document.getElementById('slots').innerHTML=ROLES.map(r=>{const p=G.slots[r];return p?`<div class="slot filled"><div class="slot-role">${wepIcon(r)} ${r}</div><div class="slot-name">${flag(p._country)} ${p.name}</div><div class="slot-from">${p._from}</div><div class="slot-ovr" style="color:${hideOvr?'var(--txt3)':ovrColor(p.ovr)}">${hideOvr?'?':p.ovr}</div></div>`:`<div class="slot"><div class="slot-role">${wepIcon(r)} ${r}</div><div class="slot-empty">—</div><div style="font-size:9px;color:var(--txt3);">Vazio</div></div>`;}).join('');
+  const ovr=f.length?Math.round(f.reduce((a,p)=>a+p.ovr,0)/f.length):0;
+  document.getElementById('ovr-fill').style.width=(hideOvr?0:ovr||0)+'%';document.getElementById('ovr-num').textContent=hideOvr?'?':(ovr||'—');setPhase(`DRAFT ${f.length}/5`);
+  // botão de entrar: no modo hard mostra o OVR revelado (recompensa por fechar o time)
+  document.getElementById('draft-btns').innerHTML=complete?`<button class="btn btn-p" onclick="startMajor()"><i class="ti ti-player-play"></i> Entrar no Major (OVR ${ovr})</button>${CFG.hard?'<div style="width:100%;text-align:center;font-size:11px;color:var(--grn);margin-top:8px"><i class="ti ti-eye"></i> Time revelado! Overall final: '+ovr+'</div>':''}`:'';
+  renderHardToggle();
 }
 const DF=['⚀','⚁','⚂','⚃','⚄','⚅'];
+function renderHardToggle(){
+  const wrap=document.getElementById('hard-toggle-wrap');if(!wrap)return;
+  const started=Object.values(G.slots).filter(Boolean).length>0;
+  wrap.innerHTML=`<div class="hard-toggle ${CFG.hard?'on':''}">
+    <div class="ht-info"><i class="ti ti-${CFG.hard?'eye-off':'eye'}"></i> <b>Modo Hard</b> <span>— overalls ocultos no draft, revelados só com o time montado</span></div>
+    <button class="ht-switch ${CFG.hard?'on':''}" onclick="toggleHard()" ${started?'disabled title="Só dá pra mudar antes de começar o draft"':''}><span class="ht-knob"></span></button>
+  </div>`;
+}
+function toggleHard(){
+  if(Object.values(G.slots).filter(Boolean).length>0)return; // não muda no meio do draft
+  CFG.hard=!CFG.hard;renderHardToggle();renderSlots();
+  if(G.curL)renderLineup(G.curL);
+}
 function rollDice(){sfx.dice();const d=document.getElementById('dice'),h=document.getElementById('dice-hint');h.textContent='SORTEANDO...';let c=0;const iv=setInterval(()=>{d.textContent=DF[Math.floor(Math.random()*6)];c++;if(c>12){clearInterval(iv);revealLineup();}},55);}
 function revealLineup(){if(!LINEUPS.filter(l=>!G.usedL.has(l.id)).length)G.usedL.clear();const av=LINEUPS.filter(l=>!G.usedL.has(l.id));const l=av[Math.floor(Math.random()*av.length)];G.usedL.add(l.id);G.curL=l;G.pick=null;document.getElementById('dice-hint').innerHTML=`▸ ${flag(l.country)} ${l.name} ${l.era}`;renderLineup(l);}
 
 function renderLineup(l){
+  const hard=CFG.hard;
   let h='';
   // barra de confirmação STICKY no topo quando já há um jogador selecionado
-  if(G.pick){h+=`<div class="confirm-bar"><span class="cb-info">${wepIcon(G.pick._role)} <b>${G.pick.name}</b> como <b>${G.pick._role}</b> · OVR ${G.pick.ovr}</span><button class="btn btn-p" onclick="confirmP()"><i class="ti ti-check"></i> Confirmar</button></div>`;}
-  h+=`<div class="lineup-card"><div class="lineup-header"><div><div class="name disp">${flag(l.country)} ${l.name}</div><div class="meta">${l.era} · ${l.style}</div></div><div class="rating-badge">OVR ${l.rating}</div></div><div class="player-list">`;
+  if(G.pick){h+=`<div class="confirm-bar"><span class="cb-info">${wepIcon(G.pick._role)} <b>${G.pick.name}</b> como <b>${G.pick._role}</b>${hard?'':` · OVR ${G.pick.ovr}`}</span><button class="btn btn-p" onclick="confirmP()"><i class="ti ti-check"></i> Confirmar</button></div>`;}
+  h+=`<div class="lineup-card"><div class="lineup-header"><div><div class="name disp">${flag(l.country)} ${l.name}</div><div class="meta">${l.era} · ${l.style}</div></div><div class="rating-badge">${hard?'<i class="ti ti-eye-off"></i> OVR ?':`OVR ${l.rating}`}</div></div><div class="player-list">`;
   l.players.forEach(p=>{
     const taken=G.takenP.has(p.name+l.id);
     const avail=availRolesFor(p);
@@ -597,14 +688,14 @@ function renderLineup(l){
       const sel=chosen&&G.pick._role===rr;
       const chipCls='role-chip'+(free?'':' off')+(sel?' sel':'');
       const click=(!taken&&free)?`onclick="event.stopPropagation();pickP('${l.id}','${p.name}','${rr}')"`:'';
-      return `<span class="${chipCls}" ${click}>${wepIcon(rr)} ${rr} <b>${ov}</b></span>`;
+      return `<span class="${chipCls}" ${click}>${wepIcon(rr)} ${rr}${hard?'':` <b>${ov}</b>`}</span>`;
     }).join('');
     const headIcon=chosen?G.pick._role:(avail[0]||Object.keys(p.roles)[0]);
     h+=`<div class="${cls}"><div class="prow-wep" style="color:${chosen?'var(--grn)':'var(--txt3)'}">${wepIcon(headIcon)}</div><div style="flex:1"><div class="prow-name">${p.name} ${reason?`<span style="font-size:10px;color:var(--red);font-weight:normal">(${reason})</span>`:''}</div><div class="prow-note">${p.note}</div><div class="role-chips">${roleChips}</div></div></div>`;
   });
   h+=`</div></div>`;
-  if(G.pick){h+=`<div class="btn-row"><button class="btn btn-p" onclick="confirmP()"><i class="ti ti-check"></i> Escolher ${G.pick.name} como ${G.pick._role} (${G.pick.ovr})</button><button class="btn" onclick="rollDice()"><i class="ti ti-refresh"></i> Rolar Novamente</button></div>`;}
-  else{h+=`<div class="btn-row"><button class="btn" onclick="rollDice()"><i class="ti ti-refresh"></i> Pular e Sortear Outro</button></div><div style="text-align:center;font-size:10px;color:var(--txt3);margin-top:8px">Clique na função desejada de um jogador para escolhê-lo</div>`;}
+  if(G.pick){h+=`<div class="btn-row"><button class="btn btn-p" onclick="confirmP()"><i class="ti ti-check"></i> Escolher ${G.pick.name} como ${G.pick._role}${hard?'':` (${G.pick.ovr})`}</button><button class="btn" onclick="rollDice()"><i class="ti ti-refresh"></i> Rolar Novamente</button></div>`;}
+  else{h+=`<div class="btn-row"><button class="btn" onclick="rollDice()"><i class="ti ti-refresh"></i> Pular e Sortear Outro</button></div><div style="text-align:center;font-size:10px;color:var(--txt3);margin-top:8px">${hard?'<i class="ti ti-eye-off"></i> Modo Hard: overalls ocultos até o time fechar':'Clique na função desejada de um jogador para escolhê-lo'}</div>`;}
   document.getElementById('lineup-reveal').innerHTML=h;
 }
 function pickP(lid,pname,role){
