@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CS:MAJOR // 7a0 DRAFT</title>
+<title>de_major // escolha seu last dance</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=JetBrains+Mono:wght@400;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
@@ -51,7 +51,10 @@ body { background-color: #050608; display: flex; justify-content: center; paddin
 /* HEADER */
 .hud-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; background: var(--bg2); border-bottom: 2px solid var(--grn-dim); }
 .hud-logo { font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 20px; letter-spacing: 0.15em; color: var(--grn); display: flex; align-items: center; gap: 8px; text-shadow: 0 0 10px rgba(46, 204, 113, 0.3); }
-.hud-logo .sub { color: var(--amber); font-size: 12px; letter-spacing: 0.1em; }
+.hud-logo .logo-de { font-family: 'JetBrains Mono', monospace; color: var(--grn-dim); font-weight: 600; letter-spacing: 0; opacity: .7; }
+.hud-logo .logo-major { font-family: 'JetBrains Mono', monospace; color: var(--grn); font-weight: 700; letter-spacing: 0; }
+.hud-logo .sub { color: var(--amber); font-size: 11px; letter-spacing: 0.05em; font-family: 'JetBrains Mono', monospace; font-weight: 400; text-transform: lowercase; }
+.hud-logo .sub::before { content: '> '; opacity: .6; }
 .hud-status { font-size: 10px; color: var(--txt2); letter-spacing: 0.1em; text-align: right; line-height: 1.5; font-family: 'JetBrains Mono', monospace; }
 .hud-status .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--grn); margin-right: 5px; box-shadow: 0 0 8px var(--grn); animation: blink 2s infinite; }
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
@@ -347,8 +350,8 @@ body { background-color: #050608; display: flex; justify-content: center; paddin
 <body>
 <div class="cs-root">
 <div class="hud-head">
-  <div class="hud-logo disp"><i class="ti ti-crosshair"></i>CS:MAJOR<span class="sub">// 7a0 DRAFT</span></div>
-  <div class="hud-status"><span class="dot"></span>SERVIDOR ATIVO <span style="color:var(--grn-dim)">v16</span><br><span id="hud-phase">DRAFT PHASE</span></div>
+  <div class="hud-logo disp"><i class="ti ti-crosshair"></i><span class="logo-de">de_</span><span class="logo-major">major</span><span class="sub">escolha seu last dance</span></div>
+  <div class="hud-status"><span class="dot"></span>SERVIDOR ATIVO <span style="color:var(--grn-dim)">v17</span><br><span id="hud-phase">DRAFT PHASE</span></div>
 </div>
 <div class="cs-pad">
 <div id="s-draft" class="screen active">
